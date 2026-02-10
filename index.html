@@ -394,6 +394,14 @@ function playOnceNoRestart(a, { volume = 1.0 } = {}) {
     a.play().catch(()=>{});
   } catch {}
 }
+function rectsOverlap(a, b, gap = 10) {
+  return !(
+    a.right  + gap < b.left  ||
+    a.left   - gap > b.right ||
+    a.bottom + gap < b.top   ||
+    a.top    - gap > b.bottom
+  );
+}
 
 // After this many dodges, No disappears (change this number anytime)
 const NO_ESCAPE_AFTER = 10;
@@ -425,60 +433,45 @@ function playPop() {
     noBtn.style.left = (btnRect.left - cardRect.left) + "px";
     noBtn.style.top  = (btnRect.top  - cardRect.top)  + "px";
   }
-
-  function moveNoButton() {
-  activateDodge();
-
-  // Confine movement to the button row (not the whole card)
-  const rowRect = btnRow.getBoundingClientRect();
-  const btnRect = noBtn.getBoundingClientRect();
-  const padding = 12;
-
-  const maxX = Math.max(padding, rowRect.width  - btnRect.width  - padding);
-  const maxY = Math.max(padding, rowRect.height - btnRect.height - padding);
-
-  const x = Math.random() * maxX;
-  const y = Math.random() * maxY;
-
-  noBtn.style.left = x + "px";
-  noBtn.style.top  = y + "px";
-
-  // fun text progression
-  noDodges++;
-  if (subText) {
-    if (noDodges === 1) subText.textContent = "Nice try 😌";
-    else if (noDodges === 3) subText.textContent = "Babe… stop 😂";
-    else if (noDodges === 5) subText.textContent = "System says: only YES allowed ✅";
-    else if (noDodges === 7) subText.textContent = "Ok I’m calling the Valentine police 🚓💘";
-  }
-
-  // If she tried too many times, No disappears + siren
-  if (noDodges >= NO_ESCAPE_AFTER) {
-    noBtn.style.display = "none";
-    if (subText) subText.textContent = "🚨 NO option removed for your safety 🚨";
-    playSiren();
-    return;
-  }
-
-  playPop();
-  growYes();
-}
 function moveNoButton() {
   activateDodge();
 
-  // Confine movement to the button row (not the whole card)
   const rowRect = btnRow.getBoundingClientRect();
-  const btnRect = noBtn.getBoundingClientRect();
+  const noRect  = noBtn.getBoundingClientRect();
+  const yesRect = yesBtn.getBoundingClientRect();
+
   const padding = 12;
+  const gap = 12;          // min space from YES
+  const tries = 30;        // retry attempts to find a good spot
 
-  const maxX = Math.max(padding, rowRect.width  - btnRect.width  - padding);
-  const maxY = Math.max(padding, rowRect.height - btnRect.height - padding);
+  const maxX = Math.max(padding, rowRect.width  - noRect.width  - padding);
+  const maxY = Math.max(padding, rowRect.height - noRect.height - padding);
 
-  const x = Math.random() * maxX;
-  const y = Math.random() * maxY;
+  let chosenX = Math.random() * maxX;
+  let chosenY = Math.random() * maxY;
 
-  noBtn.style.left = x + "px";
-  noBtn.style.top  = y + "px";
+  // Try multiple random positions until we find one that doesn't overlap YES
+  for (let i = 0; i < tries; i++) {
+    const x = Math.random() * maxX;
+    const y = Math.random() * maxY;
+
+    // Convert candidate (x,y) to viewport rect for overlap test
+    const cand = {
+      left: rowRect.left + x,
+      top: rowRect.top + y,
+      right: rowRect.left + x + noRect.width,
+      bottom: rowRect.top + y + noRect.height
+    };
+
+    if (!rectsOverlap(cand, yesRect, gap)) {
+      chosenX = x;
+      chosenY = y;
+      break;
+    }
+  }
+
+  noBtn.style.left = chosenX + "px";
+  noBtn.style.top  = chosenY + "px";
 
   // fun text progression
   noDodges++;
@@ -489,7 +482,6 @@ function moveNoButton() {
     else if (noDodges === 7) subText.textContent = "Ok I’m calling the Valentine police 🚓💘";
   }
 
-  // If she tried too many times, No disappears + siren
   if (noDodges >= NO_ESCAPE_AFTER) {
     noBtn.style.display = "none";
     if (subText) subText.textContent = "🚨 NO option removed for your safety 🚨";
@@ -500,7 +492,6 @@ function moveNoButton() {
   playPop();
   growYes();
 }
-
 
 noBtn.addEventListener("pointerdown", (e) => {
   e.preventDefault();
